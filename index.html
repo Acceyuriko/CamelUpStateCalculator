@@ -175,7 +175,7 @@
                         nextState[nextBoxIndex] = [
                           camel,
                           nextState[nextBoxIndex][0],
-                          nextState[nextBoxIndex].slice(1),
+                          ...nextState[nextBoxIndex].slice(1),
                           ...deleted.slice(1),
                         ];
                       } else {
@@ -207,7 +207,7 @@
                       );
                       if (firstPlayerCamelIndex >= 0) {
                         nextState[nextBoxIndex] = [
-                          nextState[nextBoxIndex].slice(0, firstPlayerCamelIndex),
+                          ...nextState[nextBoxIndex].slice(0, firstPlayerCamelIndex),
                           ...deleted,
                           ...nextState[nextBoxIndex].slice(firstPlayerCamelIndex),
                         ];
