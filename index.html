@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CamelUpStateCaculator</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@4.18.5/dist/antd.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/react@17.0.2/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@17.0.2/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/antd@4.18.5/dist/antd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #app {
+        width: 100%;
+        height: 100%;
+      }
+      .container {
+        padding: 8px;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: auto;
+      }
+      .ant-divider::before {
+        top: 0 !important;
+      }
+      .ant-divider::after {
+        top: 0 !important;
+      }
+      .box {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        width: 100%;
+        border: 1px solid #ccc;
+      }
+      .box-serial {
+        width: 16px;
+        text-align: right;
+      }
+      .camel-selector,
+      .trap-selector {
+        flex-grow: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      const { createElement, useState, useCallback } = React;
+      const { Select, Tag, Table, Radio, Checkbox, Divider, Button } = antd;
+
+      const MAP_LENGTH = 20;
+
+      const CAMEL = {
+        red: 'red',
+        yellow: 'yellow',
+        green: 'green',
+        blue: 'blue',
+        purple: 'purple',
+        white: 'white',
+        black: 'black',
+      };
+
+      const CAMEL_NAME = {
+        [CAMEL.red]: '红',
+        [CAMEL.yellow]: '黄',
+        [CAMEL.green]: '绿',
+        [CAMEL.blue]: '蓝',
+        [CAMEL.purple]: '紫',
+        [CAMEL.white]: '白',
+        [CAMEL.black]: '黑',
+      };
+
+      const CAMEL_COLOR = {
+        [CAMEL.red]: 'red',
+        [CAMEL.yellow]: 'yellow',
+        [CAMEL.green]: 'green',
+        [CAMEL.blue]: 'blue',
+        [CAMEL.purple]: 'purple',
+        [CAMEL.white]: '#ccc',
+        [CAMEL.black]: 'black',
+      };
+
+      const PLAYER_CAMEL = [CAMEL.red, CAMEL.yellow, CAMEL.green, CAMEL.blue, CAMEL.purple];
+
+      const DICE = {
+        red: CAMEL.red,
+        yellow: CAMEL.yellow,
+        green: CAMEL.green,
+        blue: CAMEL.blue,
+        purple: CAMEL.purple,
+        whiteBlack: 'whiteBlack',
+      };
+
+      const TRAP = {
+        plus: 1,
+        minus: -1,
+      };
+
+      const tagRender = (props) => {
+        return createElement(
+          Tag,
+          {
+            ...props,
+            color: CAMEL_COLOR[props.value],
+            style: {
+              margin: '0 4px',
+            },
+          },
+          props.label,
+        );
+      };
+
+      const App = () => {
+        const [camelIndex, setCamelIndex] = useState({
+          0: [CAMEL.red],
+          1: [CAMEL.yellow],
+          2: [CAMEL.green],
+          3: [CAMEL.blue],
+          4: [CAMEL.purple],
+          15: [CAMEL.white, CAMEL.black],
+        });
+        const [trapIndex, setTrapIndex] = useState({});
+        const [result, setResult] = useState({});
+        const [availableDices, setAvailableDices] = useState([
+          DICE.red,
+          DICE.yellow,
+          DICE.green,
+          DICE.blue,
+          DICE.purple,
+          DICE.whiteBlack,
+        ]);
+
+        const calculate = useCallback(() => {
+          console.log(camelIndex);
+          if (Object.values(camelIndex).reduce((pre, cur) => _.difference(pre, cur), Object.keys(CAMEL)).length !== 0) {
+            alert('有驼驼未选择');
+            return;
+          }
+
+          const move = (prevState, camel, step) => {
+            const nextState = _.cloneDeep(prevState);
+            for (let i = 0; i < MAP_LENGTH; i++) {
+              if (!nextState[i]) {
+                continue;
+              }
+              const camelIndex = nextState[i].indexOf(camel);
+              if (camelIndex >= 0) {
+                const deleted = nextState[i].splice(camelIndex);
+                let returnMark = false;
+                if ([CAMEL.white, CAMEL.black].includes(camel)) {
+                  if (trapIndex[i - step] === 1) {
+                    step += 1;
+                  } else if (trapIndex[i - step] === -1) {
+                    step -= 1;
+                    returnMark = true;
+                  }
+                  const nextBoxIndex = i - step;
+                  if (nextState[nextBoxIndex]) {
+                    if ([CAMEL.white, CAMEL.black].includes(nextState[nextBoxIndex][0])) {
+                      if (returnMark) {
+                        nextState[nextBoxIndex] = [
+                          camel,
+                          nextState[nextBoxIndex][0],
+                          nextState[nextBoxIndex].slice(1),
+                          ...deleted.slice(1),
+                        ];
+                      } else {
+                        nextState[nextBoxIndex] = [
+                          nextState[nextBoxIndex][0],
+                          camel,
+                          ...deleted.slice(1),
+                          ...nextState[nextBoxIndex].slice(1),
+                        ];
+                      }
+                    } else {
+                      nextState[nextBoxIndex].unshift(...deleted);
+                    }
+                  } else {
+                    nextState[nextBoxIndex] = [...deleted];
+                  }
+                } else {
+                  if (trapIndex[i + step] === 1) {
+                    step += 1;
+                  } else if (trapIndex[i + step] === -1) {
+                    step -= 1;
+                    returnMark = true;
+                  }
+                  const nextBoxIndex = i + step;
+                  if (nextState[nextBoxIndex]) {
+                    if (returnMark) {
+                      const firstPlayerCamelIndex = nextState[nextBoxIndex].findIndex((camel) =>
+                        PLAYER_CAMEL.includes(camel),
+                      );
+                      if (firstPlayerCamelIndex >= 0) {
+                        nextState[nextBoxIndex] = [
+                          nextState[nextBoxIndex].slice(0, firstPlayerCamelIndex),
+                          ...deleted,
+                          ...nextState[nextBoxIndex].slice(firstPlayerCamelIndex),
+                        ];
+                      } else {
+                        nextState[nextBoxIndex] = [...deleted];
+                      }
+                    } else {
+                      nextState[nextBoxIndex].push(...deleted);
+                    }
+                  } else {
+                    nextState[nextBoxIndex] = [...deleted];
+                  }
+                }
+                break;
+              }
+            }
+            return nextState;
+          };
+
+          const stateCount = PLAYER_CAMEL.reduce((pre, key) => {
+            pre[key] = {
+              1: 0,
+              2: 0,
+              5: 0,
+            };
+            return pre;
+          }, {});
+
+          let totalState = 0;
+
+          const iteration = async (prevState, remainingDice, ratio) => {
+            if (remainingDice.length === 1) {
+              // 还剩下一个骰子的时候是最终状态，此时计数并退出迭代
+              let rank = 0;
+              Object.keys(prevState)
+                .sort((a, b) => Number.parseInt(b) - Number.parseInt(a))
+                .forEach((key) => {
+                  const camels = prevState[key];
+                  for (let i = camels.length - 1; i >= 0; i--) {
+                    if (rank > 5) {
+                      return;
+                    }
+                    const camel = camels[i];
+                    if ([CAMEL.white, CAMEL.black].includes(camel)) {
+                      continue;
+                    }
+                    if (rank === 0) {
+                      stateCount[camel][1] += ratio;
+                    } else if (rank === 1) {
+                      stateCount[camel][2] += ratio;
+                    } else if (rank === 4) {
+                      stateCount[camel][5] += ratio;
+                    }
+                    rank += 1;
+                  }
+                });
+              totalState += ratio;
+              return;
+            }
+            for (let i = 0; i < remainingDice.length; i++) {
+              const dice = remainingDice[i];
+              const nextRemainingDice = remainingDice.slice(0, i).concat(remainingDice.slice(i + 1));
+              if (dice === DICE.whiteBlack) {
+                for (let j = 1; j <= 3; j++) {
+                  await iteration(move(prevState, CAMEL.white, j), nextRemainingDice, ratio);
+                }
+                for (let j = 1; j <= 3; j++) {
+                  await iteration(move(prevState, CAMEL.black, j), nextRemainingDice, ratio);
+                }
+              } else {
+                ratio *= 2;
+                for (let j = 1; j <= 3; j++) {
+                  await iteration(move(prevState, dice, j), nextRemainingDice, ratio);
+                }
+              }
+            }
+          };
+
+          iteration(camelIndex, availableDices, 1)
+            .then(() => {
+              console.log('totalState', totalState);
+              Object.values(stateCount).forEach((count) => {
+                count[1] = (count[1] / totalState).toFixed(2);
+                count[2] = (count[2] / totalState).toFixed(2);
+                count[5] = (count[5] / totalState).toFixed(2);
+              });
+              setResult(stateCount);
+            })
+            .catch((e) => {
+              alert(e.message);
+            });
+        }, [camelIndex, trapIndex, availableDices]);
+
+        return createElement(
+          'div',
+          {
+            className: 'container',
+          },
+          [
+            createElement(
+              Button,
+              {
+                type: 'primary',
+                onClick: calculate,
+              },
+              '计算',
+            ),
+            createElement(Table, {
+              className: 'result',
+              dataSource: PLAYER_CAMEL.map((key) => {
+                return {
+                  id: key,
+                  name: CAMEL_NAME[key],
+                  ...result[key],
+                };
+              }),
+              rowKey: (row) => row.id,
+              pagination: false,
+              bordered: true,
+              columns: [
+                {
+                  title: 'name',
+                  render: (row) => row.name,
+                },
+                {
+                  title: '1',
+                  render: (row) => row[1] ?? 'TBD',
+                },
+                {
+                  title: '2',
+                  render: (row) => row[2] ?? 'TBD',
+                },
+                {
+                  title: '5',
+                  render: (row) => row[5] ?? 'TBD',
+                },
+              ],
+            }),
+            createElement(Divider, null, '可用的骰子'),
+            createElement(
+              'div',
+              {},
+              createElement(Checkbox.Group, {
+                options: [
+                  {
+                    label: '红',
+                    value: DICE.red,
+                  },
+                  {
+                    label: '黄',
+                    value: DICE.yellow,
+                  },
+                  {
+                    label: '绿',
+                    value: DICE.green,
+                  },
+                  {
+                    label: '蓝',
+                    value: DICE.blue,
+                  },
+                  {
+                    label: '紫',
+                    value: DICE.purple,
+                  },
+                  {
+                    label: '黑白',
+                    value: DICE.whiteBlack,
+                  },
+                ],
+                defaultValue: availableDices,
+                onChange: (values) => {
+                  setAvailableDices(values);
+                },
+              }),
+            ),
+            createElement(Divider, null, '地图'),
+            createElement(
+              'div',
+              {
+                className: 'map',
+              },
+              [
+                new Array(MAP_LENGTH).fill(null).map((_, boxIndex) => {
+                  const options = Object.values(CAMEL)
+                    .filter((item) => {
+                      const index = Object.keys(camelIndex).find((i) => camelIndex[i].includes(item));
+                      return !index || index === boxIndex.toString();
+                    })
+                    .map((key) => {
+                      return createElement(
+                        Select.Option,
+                        {
+                          key,
+                          value: key,
+                        },
+                        CAMEL_NAME[key],
+                      );
+                    });
+
+                  return createElement(
+                    'div',
+                    {
+                      className: 'box',
+                    },
+                    [
+                      createElement(
+                        'div',
+                        {
+                          className: 'box-serial',
+                        },
+                        boxIndex + 1,
+                      ),
+                      createElement(
+                        Select,
+                        {
+                          className: 'camel-selector',
+                          mode: 'multiple',
+                          tagRender,
+                          allowClear: true,
+                          disabled: options.length === 0 || trapIndex[boxIndex],
+                          showSearch: false,
+                          defaultValue: camelIndex[boxIndex],
+                          onChange: (value) => {
+                            setCamelIndex({
+                              ...camelIndex,
+                              [boxIndex]: value,
+                            });
+                          },
+                        },
+                        options,
+                      ),
+                      createElement(
+                        Radio.Group,
+                        {
+                          className: 'trap-selector',
+                          defaultValue: 0,
+                          disabled: camelIndex[boxIndex]?.length > 0,
+                          onChange: ({ target: { value } }) => {
+                            if (value !== 0) {
+                              setCamelIndex({
+                                ...camelIndex,
+                                [boxIndex]: [],
+                              });
+                            }
+                            setTrapIndex({
+                              ...trapIndex,
+                              [boxIndex]: value,
+                            });
+                          },
+                        },
+                        [
+                          createElement(
+                            Radio,
+                            {
+                              value: 0,
+                            },
+                            '无',
+                          ),
+                          createElement(
+                            Radio,
+                            {
+                              value: TRAP.plus,
+                            },
+                            '+1',
+                          ),
+                          createElement(
+                            Radio,
+                            {
+                              value: TRAP.minus,
+                            },
+                            '-1',
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                }),
+              ],
+            ),
+          ],
+        );
+      };
+
+      ReactDOM.render(createElement(App), document.getElementById('app'));
+    </script>
+  </body>
+</html>
