@@ -199,7 +199,7 @@ onmessage = (e) => {
           }
         } else {
           for (let j = 1; j <= 3; j++) {
-            iteration(move(prevState, dice, j), nextRemainingDice, ratio);
+            iteration(move(prevState, dice, j), nextRemainingDice, 2 * ratio);
           }
         }
       }
