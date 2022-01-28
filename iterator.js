@@ -2,7 +2,7 @@ importScripts('./constants.js');
 importScripts('https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js');
 
 onmessage = (e) => {
-  const { initState, availableDices, trapIndex } = e.data;
+  const { initState, availableDices, trapIndex, ratio } = e.data;
 
   const stateCount = PLAYER_CAMEL.reduce((pre, key) => {
     pre[key] = {
@@ -89,60 +89,124 @@ onmessage = (e) => {
     return nextState;
   };
 
-  const iteration = (prevState, remainingDice, ratio) => {
-    if (remainingDice.length === 1) {
-      // 还剩下一个骰子的时候是最终状态，此时计数并退出迭代
-      let rank = 0;
-      Object.keys(prevState)
-        .sort((a, b) => Number.parseInt(b) - Number.parseInt(a))
-        .forEach((key) => {
-          const camels = prevState[key];
-          for (let i = camels.length - 1; i >= 0; i--) {
-            if (rank > 5) {
-              return;
-            }
-            const camel = camels[i];
-            if ([CAMEL.white, CAMEL.black].includes(camel)) {
-              continue;
-            }
-            if (rank === 0) {
-              stateCount[camel][1] += ratio;
-            } else if (rank === 1) {
-              stateCount[camel][2] += ratio;
-            } else if (rank === 4) {
-              stateCount[camel][5] += ratio;
-            }
-            rank += 1;
-          }
-        });
-      totalState += ratio;
-      return;
-    }
-    for (let i = 0; i < remainingDice.length; i++) {
-      const dice = remainingDice[i];
-      const nextRemainingDice = remainingDice.slice(0, i).concat(remainingDice.slice(i + 1));
+  if (availableDices.length === 6) {
+    const tasks = [];
+    for (let i = 0; i < availableDices.length; i++) {
+      const dice = availableDices[i];
+      const nextRemaningDice = availableDices.slice(0, i).concat(availableDices.slice(i + 1));
       if (dice === DICE.whiteBlack) {
         for (let j = 1; j <= 3; j++) {
-          iteration(move(prevState, CAMEL.white, j), nextRemainingDice, ratio);
+          tasks.push({
+            initState: move(initState, CAMEL.white, j),
+            availableDices: nextRemaningDice,
+            trapIndex,
+            ratio: 1,
+          });
         }
         for (let j = 1; j <= 3; j++) {
-          iteration(move(prevState, CAMEL.black, j), nextRemainingDice, ratio);
+          tasks.push({
+            initState: move(initState, CAMEL.black, j),
+            availableDices: nextRemaningDice,
+            trapIndex,
+            ratio: 1,
+          });
         }
       } else {
-        ratio *= 2;
         for (let j = 1; j <= 3; j++) {
-          iteration(move(prevState, dice, j), nextRemainingDice, ratio);
+          tasks.push({
+            initState: move(initState, dice, j),
+            availableDices: nextRemaningDice,
+            trapIndex,
+            ratio: 2,
+          });
         }
       }
     }
-  };
+    const workers = [];
+    let taskIndex = 0;
+    let finisedTaskIndex = 0;
+    for (let i = 0; i < Math.min(tasks.length, navigator.hardwareConcurrency); i++) {
+      const worker = new Worker('./iterator.js');
+      worker.onmessage = (e) => {
+        const { stateCount: workerStateCount, totalState: workerTotalState } = e.data;
+        Object.keys(stateCount).forEach((key) => {
+          stateCount[key][1] += workerStateCount[key][1];
+          stateCount[key][2] += workerStateCount[key][2];
+          stateCount[key][5] += workerStateCount[key][5];
+        });
+        totalState += workerTotalState;
 
-  iteration(initState, availableDices, 1);
-  console.log('totalState', totalState);
-  Object.values(stateCount).forEach((count) => {
-    count[1] = (count[1] / totalState).toFixed(2);
-    count[2] = (count[2] / totalState).toFixed(2);
-    count[5] = (count[5] / totalState).toFixed(2);
-  });
-  postMessage(stateCount);
+        if (taskIndex < tasks.length) {
+          const task = tasks[taskIndex];
+          worker.postMessage(task);
+          taskIndex++;
+        } else {
+          worker.terminate();
+        }
+
+        finisedTaskIndex++;
+        if (finisedTaskIndex === tasks.length) {
+          postMessage({ stateCount, totalState });
+        } 
+      };
+      worker.onerror = (e) => {
+        throw e;
+      };
+      workers.push(worker);
+    }
+    for (let i = 0; i < workers.length; i++) {
+      workers[i].postMessage(tasks[i]);
+      taskIndex++;
+    }
+  } else {
+    const iteration = (prevState, remainingDice, ratio) => {
+      if (remainingDice.length === 1) {
+        // 还剩下一个骰子的时候是最终状态，此时计数并退出迭代
+        let rank = 0;
+        Object.keys(prevState)
+          .sort((a, b) => Number.parseInt(b) - Number.parseInt(a))
+          .forEach((key) => {
+            const camels = prevState[key];
+            for (let i = camels.length - 1; i >= 0; i--) {
+              if (rank > 5) {
+                return;
+              }
+              const camel = camels[i];
+              if ([CAMEL.white, CAMEL.black].includes(camel)) {
+                continue;
+              }
+              if (rank === 0) {
+                stateCount[camel][1] += ratio;
+              } else if (rank === 1) {
+                stateCount[camel][2] += ratio;
+              } else if (rank === 4) {
+                stateCount[camel][5] += ratio;
+              }
+              rank += 1;
+            }
+          });
+        totalState += ratio;
+        return;
+      }
+      for (let i = 0; i < remainingDice.length; i++) {
+        const dice = remainingDice[i];
+        const nextRemainingDice = remainingDice.slice(0, i).concat(remainingDice.slice(i + 1));
+        if (dice === DICE.whiteBlack) {
+          for (let j = 1; j <= 3; j++) {
+            iteration(move(prevState, CAMEL.white, j), nextRemainingDice, ratio);
+          }
+          for (let j = 1; j <= 3; j++) {
+            iteration(move(prevState, CAMEL.black, j), nextRemainingDice, ratio);
+          }
+        } else {
+          ratio *= 2;
+          for (let j = 1; j <= 3; j++) {
+            iteration(move(prevState, dice, j), nextRemainingDice, ratio);
+          }
+        }
+      }
+    };
+    iteration(initState, availableDices, ratio);
+    postMessage({ stateCount, totalState });
+  }
 };

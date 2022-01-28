@@ -118,7 +118,14 @@
 
           const worker = new Worker('./iterator.js');
           worker.onmessage = (e) => {
-            setResult(e.data);
+            const { stateCount, totalState } = e.data;
+            console.log('totalState', totalState);
+            Object.values(stateCount).forEach((count) => {
+              count[1] = (count[1] / totalState).toFixed(2);
+              count[2] = (count[2] / totalState).toFixed(2);
+              count[5] = (count[5] / totalState).toFixed(2);
+            });
+            setResult(stateCount);
             setLoading(false);
             worker.terminate();
           };
