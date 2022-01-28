@@ -124,7 +124,7 @@ onmessage = (e) => {
     }
     const workers = [];
     let taskIndex = 0;
-    let finisedTaskIndex = 0;
+    let finishedTaskIndex = 0;
     for (let i = 0; i < Math.min(tasks.length, navigator.hardwareConcurrency); i++) {
       const worker = new Worker('./iterator.js');
       worker.onmessage = (e) => {
@@ -137,25 +137,24 @@ onmessage = (e) => {
         totalState += workerTotalState;
 
         if (taskIndex < tasks.length) {
-          const task = tasks[taskIndex];
-          worker.postMessage(task);
+          worker.postMessage(tasks[taskIndex]);
           taskIndex++;
         } else {
           worker.terminate();
         }
 
-        finisedTaskIndex++;
-        if (finisedTaskIndex === tasks.length) {
+        finishedTaskIndex++;
+        if (finishedTaskIndex === tasks.length) {
           postMessage({ stateCount, totalState });
-        } 
+        }
       };
       worker.onerror = (e) => {
         throw e;
       };
       workers.push(worker);
     }
-    for (let i = 0; i < workers.length; i++) {
-      workers[i].postMessage(tasks[i]);
+    while (taskIndex < workers.length) {
+      workers[taskIndex].postMessage(tasks[taskIndex]);
       taskIndex++;
     }
   } else {
@@ -199,7 +198,6 @@ onmessage = (e) => {
             iteration(move(prevState, CAMEL.black, j), nextRemainingDice, ratio);
           }
         } else {
-          ratio *= 2;
           for (let j = 1; j <= 3; j++) {
             iteration(move(prevState, dice, j), nextRemainingDice, ratio);
           }

@@ -69,6 +69,10 @@
   </head>
   <body>
     <div id="app"></div>
+    <script src="//cdn.jsdelivr.net/npm/eruda"></script>
+    <script>
+      eruda.init();
+    </script>
     <script src="./constants.js"></script>
     <script>
       const { createElement, useState, useCallback } = React;
@@ -119,6 +123,7 @@
           const worker = new Worker('./iterator.js');
           worker.onmessage = (e) => {
             const { stateCount, totalState } = e.data;
+            console.log('stateCount', JSON.parse(JSON.stringify(stateCount)));
             console.log('totalState', totalState);
             Object.values(stateCount).forEach((count) => {
               count[1] = (count[1] / totalState).toFixed(2);
@@ -130,7 +135,7 @@
             worker.terminate();
           };
           worker.onerror = (e) => {
-            alert(e.message);
+            console.error(e);
             setLoading(false);
             worker.terminate();
           };
@@ -139,6 +144,7 @@
             initState: camelIndex,
             trapIndex,
             availableDices,
+            ratio: 1,
           });
         }, [camelIndex, trapIndex, availableDices]);
 
